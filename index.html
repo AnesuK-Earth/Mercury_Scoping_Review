@@ -118,7 +118,7 @@
         }
         .btn-link:hover { background-color: #e9ecef; color: #212529; }
 
-        /* Match Map Legend to Static Graphic */
+        /* Match Map Legend to Your Graphic */
         .legend {
             background: white;
             padding: 14px;
@@ -135,7 +135,6 @@
             margin-top: 5px;
             margin-right: 10px; 
             border-radius: 50%; 
-            border: 1px solid #333;
         }
     </style>
 </head>
@@ -194,7 +193,7 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script>
-        // South Africa Boundaries and Zoom Restrictions
+        // South Africa Bounds Configuration
         const saBounds = L.latLngBounds([-35.0, 16.0], [-22.0, 33.0]);
         
         const map = L.map('map', {
@@ -206,12 +205,12 @@
             maxBoundsViscosity: 1.0
         });
 
-        // Clean stark-light baseline tile layout
+        // Greyscale basemap
         L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
             attribution: '&copy; OpenStreetMap &copy; CARTO'
         }).addTo(map);
 
-        // Fetch South African provincial boundaries overlay
+        // Fetch South African provincial overlay lines
         fetch('https://raw.githubusercontent.com/longwilliams/south-africa-provinces-geojson/master/south-africa-provinces.geojson')
             .then(res => res.json())
             .then(geojsonData => {
@@ -225,36 +224,34 @@
                     },
                     interactive: false
                 }).addTo(map);
-            }).catch(err => console.log("Provincial overlay loading fallback."));
+            }).catch(err => console.log("Provincial overlay loader baseline."));
 
         let allData = [];
         let markersGroup = L.layerGroup().addTo(map);
         let legendControl = null;
 
-        // Updated Custom Color Mapping to mimic your static legend graphic perfectly
+        // Colors assigned exactly to match your static legend image
         const sampleColors = {
-            'Soil': '#00bfff',         /* Light Sky Blue */
-            'Dust': '#ffff00',         /* Bright Yellow */
-            'Soil and Dust': '#ffff00',/* Yellow inner base, distinct cyan edge added below */
-            'HgP': '#e67e22'           /* Deep Orange */
+            'Soil': '#00bfff',
+            'Dust': '#ffff00',
+            'Soil and Dust': '#ffff00',
+            'HgP': '#e67e22'
         };
         
-        const defaultColor = '#9e9e9e'; /* Flat Grey fallback if name misspelled */
+        const defaultColor = '#9e9e9e'; 
 
         function getMarkerStyles(type) {
             const cleanedType = type ? type.trim() : '';
             const baseColor = sampleColors[cleanedType] || defaultColor;
             
-            // Special rule for split combined type "Soil and Dust" to showcase both colors clearly
             if (cleanedType === 'Soil and Dust') {
                 return {
-                    fillColor: '#ffff00', // Yellow core
-                    color: '#00bfff',     // Cyan/Blue outline ring
+                    fillColor: '#ffff00', 
+                    color: '#00bfff',     
                     weight: 3.5
                 };
             }
             
-            // Standard outline matching the crisp black borders from your legend image
             return {
                 fillColor: baseColor,
                 color: '#222222',
@@ -262,14 +259,13 @@
             };
         }
 
-        // Parse modified CSV configuration
+        // Parse your CSV data structure
         Papa.parse('data.csv', {
             download: true,
             header: true,
             dynamicTyping: true,
             skipEmptyLines: true,
             complete: function(results) {
-                // Account for row checking explicitly handling typo fallback "Sampe_Type" if present
                 allData = results.data.filter(row => row.ID || row.Title);
                 populateFilterOptions(allData);
                 renderMapAndTable(allData);
@@ -293,11 +289,9 @@
             tableBody.innerHTML = '';
 
             data.forEach(row => {
-                // Dynamically fallback between exact column syntax adjustments
                 const currentSampleType = row.Sample_Type || row.Sampe_Type || row['Sample Type'];
                 const styleOpts = getMarkerStyles(currentSampleType);
 
-                // 1. Draw Map Point
                 if (row.Latitude && row.Longitude) {
                     const marker = L.circleMarker([row.Latitude, row.Longitude], {
                         radius: 8,
@@ -316,7 +310,6 @@
                     markersGroup.addLayer(marker);
                 }
 
-                // 2. Data Table Population 
                 const tr = document.createElement('tr');
                 tr.id = `row-${row.ID}`;
                 tr.onclick = () => {
@@ -366,7 +359,6 @@
             renderMapAndTable(filtered);
         }
 
-        // Generates the customized color legend matching the upload layout specification
         function updateLegend() {
             if (legendControl) map.removeControl(legendControl);
             
@@ -375,10 +367,9 @@
                 const div = L.DomUtil.create('div', 'legend');
                 div.innerHTML = '<strong>Legend</strong><br>';
                 
-                // Manual loop to make sure styles map uniquely for mixed boundary types
                 div.innerHTML += `<i style="background:#00bfff; border: 1px solid #222;"></i> Soil Only<br>`;
                 div.innerHTML += `<i style="background:#ffff00; border: 1px solid #222;"></i> Dust Only<br>`;
-                div.innerHTML += `<i style="background:#ffff00; border: 3px solid #00bfff; width:10px; height:10px;"></i> Soil and Dust<br>`;
+                div.innerHTML += `<i style="background:#ffff00; border: 3px solid #00bfff; width:10px; height:10px; margin-top:6px; margin-right:12px;"></i> Soil and Dust<br>`;
                 div.innerHTML += `<i style="background:#e67e22; border: 1px solid #222;"></i> HgP Only<br>`;
                 
                 return div;
