@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>South Africa Mercury Scoping Review Map</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: #f4f6f9; }
+        h1 { color: #2c3e50; text-align: center; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #7f8c8d; margin-top: 0; margin-bottom: 25px; }
+        .container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        
+        /* Filter Sidebar Layout */
+        .main-layout { display: flex; gap: 20px; height: 550px; }
+        .filter-panel { width: 250px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; gap: 15px; }
+        .filter-panel h3 { margin-top: 0; color: #34495e; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px; }
+        .filter-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-weight: bold; font-size: 0.9em; color: #555; }
+        select { padding: 8px; border-radius: 4px; border: 1px solid #ccc; font-size: 0.9em; }
+        
+        /* Map Styling */
+        #map { flex-grow: 1; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* Table Styling */
+        .table-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-height: 400px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background-color: #34495e; color: white; padding: 12px; position: sticky; top: 0; }
+        td { padding: 12px; border-bottom: 1px solid #e0e0e0; font-size: 0.95em; }
+        tr:hover { background-color: #f1f2f6; cursor: pointer; }
+        tr.highlighted { background-color: #ffeaa7 !important; font-weight: bold; }
+        a { color: #3498db; text-decoration: none; font-weight: bold; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <h1>Mercury Concentration Scoping Review</h1>
+    <p class="subtitle">Interactive Mapping of Soil, Dust, and Particulate Matter across South Africa</p>
+
+    <div class="container">
+        <div class="main-layout">
+            <div class="filter-panel">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label for="provinceFilter">Province</label>
+                    <select id="provinceFilter" onchange="filterData()">
+                        <option value="all">All Provinces</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="sampleFilter">Sample Type</label>
+                    <select id="sampleFilter" onchange="filterData()">
+                        <option value="all">All Types</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="yearFilter">Year of Publication</label>
+                    <select id="yearFilter" onchange="filterData()">
+                        <option value="all">All Years</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="map"></div>
+        </div>
+
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Author</th>
+                        <th>Year</th>
+                        <th>Province</th>
+                        <th>Sample Type</th>
+                        <th>Concentration</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize Map centered on South Africa
+        const map = L.map('map').setView([-29.0, 25.0], 5.5);
+
+        // Add sleek map background layers (CartoDB Positron)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        let allData = [];
+        let markersGroup = L.layerGroup().addTo(map);
+
+        // Load and Parse the CSV file automatically
+        Papa.parse('data.csv', {
+            download: true,
+            header: true,
+            dynamicTyping: true,
+            complete: function(results) {
+                allData = results.data.filter(row => row.ID); // Filter out empty rows
+                populateFilterOptions(allData);
+                renderMapAndTable(allData);
+            }
+        });
+
+        // Function to dynamically fill dropdown filter menus based on your data
+        function populateFilterOptions(data) {
+            const provinces = [...new Set(data.map(item => item.Province))].sort();
+            const types = [...new Set(data.map(item => item.Sample_Type))].sort();
+            const years = [...new Set(data.map(item => item.Year))].sort((a,b) => b-a);
+
+            provinces.forEach(p => { if(p) document.getElementById('provinceFilter').innerHTML += `<option value="${p}">${p}</option>`; });
+            types.forEach(t => { if(t) document.getElementById('sampleFilter').innerHTML += `<option value="${t}">${t}</option>`; });
+            years.forEach(y => { if(y) document.getElementById('yearFilter').innerHTML += `<option value="${y}">${y}</option>`; });
+        }
+
+        // Color coding markers based on Concentration values (Adjust thresholds as needed!)
+        function getColor(concentration) {
+            return concentration > 5.0 ? '#e74c3c' : // Red for high
+                   concentration > 1.0 ? '#f39c12' : // Orange for medium
+                                         '#2ecc71';  // Green for low
+        }
+
+        // Main function to draw map points and build the table
+        function renderMapAndTable(data) {
+            markersGroup.clearLayers();
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+
+            data.forEach(row => {
+                // 1. Add Marker to Map if coordinates exist
+                if (row.Latitude && row.Longitude) {
+                    const marker = L.circleMarker([row.Latitude, row.Longitude], {
+                        radius: 8,
+                        fillColor: getColor(row.Concentration),
+                        color: '#fff',
+                        weight: 1,
+                        fillOpacity: 0.8
+                    });
+
+                    // Hover Tooltip setup
+                    marker.bindTooltip(`<strong>Concentration:</strong> ${row.Concentration}<br><strong>Year:</strong> ${row.Year}`, {
+                        direction: 'top',
+                        sticky: true
+                    });
+
+                    // Click event to highlight table row
+                    marker.on('click', () => {
+                        highlightTableRow(row.ID);
+                    });
+
+                    markersGroup.addLayer(marker);
+                }
+
+                // 2. Add Row to Table
+                const tr = document.createElement('tr');
+                tr.id = `row-${row.ID}`;
+                tr.onclick = () => {
+                    map.setView([row.Latitude, row.Longitude], 8);
+                    highlightTableRow(row.ID);
+                };
+
+                tr.innerHTML = `
+                    <td>${row.ID}</td>
+                    <td>${row.Title}</td>
+                    <td>${row.Author}</td>
+                    <td>${row.Year}</td>
+                    <td>${row.Province}</td>
+                    <td>${row.Sample_Type}</td>
+                    <td><strong>${row.Concentration}</strong></td>
+                    <td><a href="${row.Link}" target="_blank">View Paper 🔗</a></td>
+                `;
+                tableBody.appendChild(tr);
+            });
+        }
+
+        // Function to highlight a row when point clicked
+        function highlightTableRow(id) {
+            document.querySelectorAll('tr').forEach(r => r.classList.remove('highlighted'));
+            const targetRow = document.getElementById(`row-${id}`);
+            if (targetRow) {
+                targetRow.classList.add('highlighted');
+                targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        // Filtering logic
+        function filterData() {
+            const provinceVal = document.getElementById('provinceFilter').value;
+            const sampleVal = document.getElementById('sampleFilter').value;
+            const yearVal = document.getElementById('yearFilter').value;
+
+            const filtered = allData.filter(item => {
+                const matchProvince = (provinceVal === 'all' || item.Province === provinceVal);
+                const matchSample = (sampleVal === 'all' || item.Sample_Type === sampleVal);
+                const matchYear = (yearVal === 'all' || String(item.Year) === yearVal);
+                return matchProvince && matchSample && matchYear;
+            });
+
+            renderMapAndTable(filtered);
+        }
+    </script>
+</body>
+</html>
